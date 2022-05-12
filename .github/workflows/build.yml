@@ -1,0 +1,55 @@
+name: build
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-binaries:
+    strategy:
+      matrix:
+        os: [windows, macos, ubuntu]
+        include:
+          - os: windows
+            build: |
+                C:\msys64\usr\bin\wget.exe https://raw.githubusercontent.com/tonlabs/ever-sdk/master/ton_client/tonclient.h
+                C:\msys64\usr\bin\wget.exe http://sdkbinaries-ws.tonlabs.io/tonclient_1_win32_dll.gz
+                C:\msys64\usr\bin\wget.exe http://sdkbinaries-ws.tonlabs.io/tonclient_1_win32_lib.gz
+                7z x tonclient_1_win32_dll.gz
+                7z x tonclient_1_win32_lib.gz
+                mv tonclient_1_win32_dll ton_client.dll
+                mv tonclient_1_win32_lib ton_client.lib
+                go build ever-sdk-version.go
+                mv ever-sdk-version.exe ever-sdk-version-win32.exe
+            artifact: "ever-sdk-version-win32.exe"
+          - os: macos
+            build: |
+                wget https://raw.githubusercontent.com/tonlabs/ever-sdk/master/ton_client/tonclient.h
+                wget http://sdkbinaries-ws.tonlabs.io/tonclient_1_darwin.gz
+                gunzip tonclient_1_darwin.gz
+                mv tonclient_1_darwin libton_client.dylib
+                go build ever-sdk-version.go
+                mv ever-sdk-version ever-sdk-version-darwin
+            artifact: "ever-sdk-version-darwin"
+          - os: ubuntu
+            build: |
+                wget https://raw.githubusercontent.com/tonlabs/ever-sdk/master/ton_client/tonclient.h
+                wget http://sdkbinaries-ws.tonlabs.io/tonclient_1_linux.gz
+                gunzip tonclient_1_linux.gz
+                mv tonclient_1_linux libton_client.so
+                go build ever-sdk-version.go
+                mv ever-sdk-version ever-sdk-version-linux
+            artifact: "ever-sdk-version-linux"
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+      - run: |
+          ${{ matrix.build }}
+      - uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ matrix.artifact }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
